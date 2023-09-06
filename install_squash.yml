@@ -1,0 +1,60 @@
+---
+- name: "install squash"
+  hosts: localhost
+  order: sorted
+  become: true
+  vars:
+  - package: java-11-openjdk
+  tasks:
+  - name: get package url squash
+    get_url: 
+      url:  https://nexus.squashtest.org/nexus/repository/public-releases/tm/core/squash-tm-distribution/1.22.9.RELEASE/squash-tm-1.22.9.RELEASE.tar.gz
+      dest: /opt
+  - name: Extract sqaush.tar
+    ansible.builtin.unarchive:
+      src: /opt/squash-tm-1.22.9.RELEASE.tar.gz
+      dest: /opt/
+  - name: add user squashtm
+    ansible.builtin.user:
+      name: squash-tm
+      system: yes
+      create_home: no
+      home: /opt/squash-tm
+  - name: changer owner
+    ansible.builtin.file:
+      state: directory
+      path: /opt/squash-tm/
+      owner: squash-tm
+      group: squash-tm
+      recurse: yes 
+  - name: Ajouter les variables de connexion à la base de données
+    ansible.builtin.lineinfile:
+      path: /opt/squash-tm/bin/startup.sh
+      line: |
+          # Extra arguments passed to JVM
+          JAVA_ARGS="-Xms128m -Xmx2048m -XX:MaxPermSize=256m -Djava.awt.headless=true -XX:+HeapDumpOnOutOfMemoryError"
+
+          # DataBase parameters
+          DB_URL="jdbc:mysql://localhost:3306/squashtm"
+          DB_TYPE="mysql"
+          DB_USERNAME="squashtm"
+          DB_PASSWORD="squashtm"
+          DB_DIALECT="org.hibernate.dialect.MySQLDialect"
+          DB_DRIVER="com.mysql.jdbc.Driver"
+
+  - name: Copier le service systemd SquashTM
+    copy:
+      src: files/squash-tm.service
+      dest: /etc/systemd/system/squash-tm.service
+      mode: 0644
+    
+  - name: Reload systemd    
+    systemd:
+      daemon_reload: yes
+
+  - name: Activer le service SquashTM au démarrage
+    systemd:
+      name: squash-tm
+      enabled: yes
+
+      
